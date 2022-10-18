@@ -1,0 +1,10 @@
+
+# Ignore all .ipynb which contain solutions not made by me.
+
+*.ipynb
+
+# Ignore pycache, tempCodeRunner and vscode settings
+
+**.vscode/
+**__pycache__/
+**tempCodeRunnerFile.py
