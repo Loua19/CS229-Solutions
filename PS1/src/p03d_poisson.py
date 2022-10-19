@@ -1,5 +1,6 @@
 import numpy as np
 import util
+import matplotlib.pyplot as plt
 
 from linear_model import LinearModel
 
@@ -14,11 +15,29 @@ def main(lr, train_path, eval_path, pred_path):
         pred_path: Path to save predictions.
     """
     # Load training set
-    x_train, y_train = util.load_dataset(train_path, add_intercept=False)
+    x_train, y_train = util.load_dataset(train_path, add_intercept=True)
+    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
 
     # *** START CODE HERE ***
+    
     # Fit a Poisson Regression model
     # Run on the validation set, and use np.savetxt to save outputs to pred_path
+
+    # NOTE: The problem here that took hours to debug was find a working value of lr.
+
+    model = PoissonRegression()
+    model.step_size = lr
+    model.fit(x_train, y_train)
+
+    # Plotting the prediction
+
+    y_pred = model.predict(x_eval)
+    plt.plot(y_eval, 'go', label='True value')
+    plt.plot(y_pred, 'rx', label='Model prediction')
+    plt.suptitle('Validation Set', fontsize=12)
+    plt.legend(loc='upper left')
+    plt.savefig('../output/p03d.png')
+    
     # *** END CODE HERE ***
 
 
@@ -39,6 +58,21 @@ class PoissonRegression(LinearModel):
             y: Training example labels. Shape (m,).
         """
         # *** START CODE HERE ***
+
+        m, n = x.shape
+        self.theta = np.zeros(n)
+        j = 0
+
+        # Implementing (batch) gradient descent
+
+        while True:
+
+            theta = np.copy(self.theta)
+            self.theta += self.step_size * (x.T).dot(y - np.exp( x.dot(self.theta)))
+
+            if np.linalg.norm(self.theta - theta) < self.eps or j > self.max_iter:
+                break
+
         # *** END CODE HERE ***
 
     def predict(self, x):
@@ -51,4 +85,15 @@ class PoissonRegression(LinearModel):
             Floating-point prediction for each input, shape (m,).
         """
         # *** START CODE HERE ***
+
+        return np.exp(np.matmul(x, self.theta))
+
         # *** END CODE HERE ***
+
+if __name__ == "__main__":
+    
+    # For testing purposes
+    main(lr = 6e-11,
+         train_path='../data/ds4_train.csv',
+         eval_path='../data/ds4_valid.csv',
+         pred_path='../output/')
