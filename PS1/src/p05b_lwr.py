@@ -85,7 +85,7 @@ class LocallyWeightedLinearRegression(LinearModel):
 
         # Initialising W, solving normally equations and returning theta for each data point
         for i in range(m):
-            W =  np.diag( np.exp(  (np.sum( (self.x - x[i])**2, axis = 1)) / (-2*self.tau) ) )
+            W =  np.diag( np.exp(  (np.sum( (self.x - x[i])**2, axis = 1)) / (-2*self.tau**2) ) )
             theta[i] = np.linalg.inv( ((self.x).T) @ W @ self.x ) @ ( ((self.x).T) @ W ) @ self.y
 
         return np.sum( x * theta, axis = 1)

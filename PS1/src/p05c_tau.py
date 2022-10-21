@@ -42,12 +42,32 @@ def main(tau_values, train_path, valid_path, test_path, pred_path):
         plt.suptitle('Model with tau = ' + str(tau), fontsize=12)
         plt.xlabel('x')
         plt.ylabel('y')
-        plt.savefig('../output/p05b_' + str(tau) + '.png')
+        plt.savefig('../output/p05c_' + str(tau) + '.png')
 
         m, n = x_valid.shape
-        mse[tau] = 1/m * np.sum((y_pred - y_valid)**2)
+        mse[1/m * np.sum((y_pred - y_valid)**2)] = tau 
 
-    return(mse)
+    bestTau = mse[min(mse.keys())]
+    
+    # Plotting best tau value on test set
+
+    
+    x_test, y_test = util.load_dataset(test_path, add_intercept=True)
+
+    model = LocallyWeightedLinearRegression(bestTau)
+    model.fit(x_train, y_train)
+    y_testPred = model.predict(x_test)
+
+    plt.figure()
+    plt.plot(x_test[:, 1], y_test, 'bo', linewidth=2, label='True value')
+    plt.plot(x_test[:, 1], y_testPred, 'ro', linewidth=2, label='Model prediction')
+    plt.legend(loc='upper left')
+    plt.suptitle('Model on test test with tau = ' + str(bestTau), fontsize=12)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.savefig('../output/p05c_test.png')
+
+    return(1/m * np.sum((y_testPred - y_test)**2))
  
     # *** END CODE HERE ***
 
@@ -57,5 +77,5 @@ if __name__ == "__main__":
     print(main(tau_values=[3e-2, 5e-2, 1e-1, 5e-1, 1e0, 1e1],
         train_path ='../data/ds5_train.csv',
         valid_path = '../data/ds5_valid.csv',
-        test_path = '../data/ds5_valid.csv',
+        test_path = '../data/ds5_test.csv',
         pred_path = '../output'))
