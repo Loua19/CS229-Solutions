@@ -21,6 +21,9 @@ def get_words(message):
     """
 
     # *** START CODE HERE ***
+ 
+    return (message.lower()).split()
+             
     # *** END CODE HERE ***
 
 
@@ -41,6 +44,24 @@ def create_dictionary(messages):
     """
 
     # *** START CODE HERE ***
+    
+    wordCount = {}
+    for m in messages:
+        for w in get_words(m):
+            wordCount[w] = wordCount.get(w, 0) + 1
+
+    i = 0 
+
+    for w in list(wordCount.keys()):
+
+        if wordCount[w] >= 5:
+            wordCount[w] = i
+            i = i + 1
+        else:
+            del wordCount[w]
+
+    return wordCount
+
     # *** END CODE HERE ***
 
 
@@ -62,6 +83,24 @@ def transform_text(messages, word_dictionary):
         A numpy array marking the words present in each message.
     """
     # *** START CODE HERE ***
+
+    wordMatrix = np.zeros((len(messages), len(word_dictionary)))
+    i = 0
+
+    for m in messages:
+
+        wordCount = {}
+        for w in get_words(m):
+            wordCount[w] = wordCount.get(w, 0) + 1
+
+        for w in wordCount:
+            if w in word_dictionary:
+                wordMatrix[i, word_dictionary[w]] = wordCount[w]
+        
+        i = i + 1
+
+    return wordMatrix
+
     # *** END CODE HERE ***
 
 
@@ -82,6 +121,17 @@ def fit_naive_bayes_model(matrix, labels):
     """
 
     # *** START CODE HERE ***
+
+    m, n = matrix.shape
+    matrix[matrix != 0] = 1 
+    
+    phi_0 = (np.sum( matrix[labels == 0], axis = 0) + 1 ) * 1/( np.sum(labels == 0) + 2)
+    phi_1 = (np.sum( matrix[labels == 1], axis = 0) + 1 ) * 1/( np.sum(labels == 1) + 2)
+    phi_label = np.sum( labels == 1 ) * 1/m 
+
+    # returns model as list
+    return [phi_0, phi_1, phi_label]
+
     # *** END CODE HERE ***
 
 
@@ -98,6 +148,22 @@ def predict_from_naive_bayes_model(model, matrix):
     Returns: A numpy array containg the predictions from the model
     """
     # *** START CODE HERE ***
+
+    # Calculate probability that label == 1, if < 0.5 output label == 0
+
+    phi_0, phi_1, phi_label = model[0], model[1], model[2]
+    matrix[matrix != 0] = 1
+    
+    temp = phi_0 * matrix + (1-phi_0) * (1-matrix)
+    p_xGiven0 = np.exp(np.sum(np.log(temp), axis = 1))
+
+    temp = phi_1 * matrix + (1-phi_1) * (1-matrix)
+    p_xGiven1 = np.exp(np.sum(np.log(temp), axis = 1))
+
+    p_y1 = (p_xGiven1 * phi_label) / (p_xGiven1 * phi_label + p_xGiven0 * (1-phi_label))
+
+    return np.around(p_y1)
+
     # *** END CODE HERE ***
 
 
@@ -114,6 +180,14 @@ def get_top_five_naive_bayes_words(model, dictionary):
     Returns: The top five most indicative words in sorted order with the most indicative first
     """
     # *** START CODE HERE ***
+    
+    phi_0, phi_1 = model[0], model[1]
+    
+    invertedDic = { dictionary[w] : w for w in dictionary}
+    wordKeys = np.flip(np.argsort(np.log(phi_1) - np.log(phi_0)))[:5]
+
+    return [invertedDic[k] for k in wordKeys]
+
     # *** END CODE HERE ***
 
 
@@ -134,6 +208,20 @@ def compute_best_svm_radius(train_matrix, train_labels, val_matrix, val_labels, 
         The best radius which maximizes SVM accuracy.
     """
     # *** START CODE HERE ***
+
+    maxAccuracy = 0
+
+    for r in radius_to_consider:
+
+        svmPrediction = svm.train_and_predict_svm(train_matrix, train_labels, val_matrix, r)
+        svmAccuracy = np.mean(svmPrediction == val_labels)
+        
+        if svmAccuracy >= maxAccuracy:
+            res = r
+            maxAccuracy = svmAccuracy
+    
+    return res
+
     # *** END CODE HERE ***
 
 
