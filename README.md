@@ -1,4 +1,4 @@
-My solutions for CS229 problem sets (Autumn 2018). Originally cloned from https://github.com/maxim5/cs229-2018-autumn.
+My solutions for the programming parts of the CS229 (Autumn 2018) problem sets. Originally cloned from https://github.com/maxim5/cs229-2018-autumn.
 
 To run the code:
 - Install Anaconda

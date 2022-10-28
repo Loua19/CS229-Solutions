@@ -16,6 +16,9 @@ def initial_state():
     """
 
     # *** START CODE HERE ***
+
+    return []
+
     # *** END CODE HERE ***
 
 
@@ -33,6 +36,15 @@ def predict(state, kernel, x_i):
         Returns the prediction (i.e 0 or 1)
     """
     # *** START CODE HERE ***
+
+    res = 0
+    
+    for (b, x) in state:
+
+        res = res + b * kernel(x, x_i)
+
+    return res
+
     # *** END CODE HERE ***
 
 
@@ -46,7 +58,15 @@ def update_state(state, kernel, learning_rate, x_i, y_i):
         x_i: A vector containing the features for a single instance
         y_i: A 0 or 1 indicating the label for a single instance
     """
-    # *** START CODE HERE ***
+    # *** START CODE HERE ***  
+    
+    pred = predict(state, kernel, x_i)
+
+    if pred >= 0:
+        state.append((learning_rate * (y_i - 1), x_i))
+    else:
+        state.append((learning_rate * y_i, x_i))
+
     # *** END CODE HERE ***
 
 
