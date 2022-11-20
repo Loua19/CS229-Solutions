@@ -28,11 +28,23 @@ def main(is_semi_supervised, trial_num):
     # *** START CODE HERE ***
     # (1) Initialize mu and sigma by splitting the m data points uniformly at random
     # into K groups, then calculating the sample mean and covariance for each group
+
+    splits = np.array(np.split(np.random.permutation(x), K))
+    mu = np.mean(splits, axis = 1)
+    sigma = np.array([np.cov(splits[i,:,:].T) for i in range(K)]) 
+
     # (2) Initialize phi to place equal probability on each Gaussian
     # phi should be a numpy array of shape (K,)
+
+    phi = 1/K * np.ones((K))
+
     # (3) Initialize the w values to place equal probability on each Gaussian
     # w should be a numpy array of shape (m, K)
-    # *** END CODE HERE ***
+
+    m, n = x.shape
+    w = 1/K * np.ones((m, K))
+
+    # ** END CODE HERE ***
 
     if is_semi_supervised:
         w = run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma)
@@ -74,14 +86,42 @@ def run_em(x, w, phi, mu, sigma):
     it = 0
     ll = prev_ll = None
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
         # *** START CODE HERE
         # (1) E-step: Update your estimates in w
+        
+        # np.einsum( 'ij, ij -> i', V, W ) calculates dot products of the rows of V and W.
+        # np.einsum('ij, kj -> ki', M, V) calculates matrix M applied to rows of V.
+        
+        for j in range(K):
+            w[:,j] = np.linalg.det(sigma[j])**(-0.5) * np.exp( -0.5 * (
+                     np.einsum( 'ij, ij -> i', (x - mu[j,:]) , np.einsum('ij, kj -> ki', np.linalg.inv(sigma[j]), (x - mu[j,:]))))) * phi[j]
+
+        w = w / np.sum(w, axis = 1).reshape((-1, 1))
+        
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        
+        # np.einsum('il, ij -> lj, W, X) returns vectors (indexed by l) sum_i (w^(i)_l x^(i)).
+        # np.einsum('ij, ik -> ijk', X, Y) returns matrices M[i] = X[i] X[i]^T.
+
+        m, n = x.shape
+
+        phi = 1/m * np.sum(w, axis = 0)
+        mu = np.einsum( 'il, ij -> lj', w, x) / np.sum(w, axis = 0).reshape((K, 1))
+        
+        for j in range(K):
+            sigma[j] = np.sum( w[:,j].reshape((m, 1 ,1)) * np.einsum( 'ij, ik -> ijk', (x - mu[j]), (x - mu[j])), axis = 0) / np.sum(w[:, j])
+
         # (3) Compute the log-likelihood of the data to check for convergence.
         # By log-likelihood, we mean `ll = sum_x[log(sum_z[p(x|z) * p(z)])]`.
         # We define convergence by the first iteration where abs(ll - prev_ll) < eps.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+
+        it += 1
+        prev_ll = ll
+        ll = np.sum(np.log(np.sum(w, axis = 1)))
+
+        print(it, ll)
+
         # *** END CODE HERE ***
 
     return w
@@ -116,13 +156,45 @@ def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
     it = 0
     ll = prev_ll = None
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
         # *** START CODE HERE ***
         # (1) E-step: Update your estimates in w
+        
+        for j in range(K):
+            w[:,j] = np.linalg.det(sigma[j])**(-0.5) * np.exp( -0.5 * (
+                     np.einsum( 'ij, ij -> i', (x - mu[j,:]) , np.einsum('ij, kj -> ki', np.linalg.inv(sigma[j]), (x - mu[j,:]))))) * phi[j]
+
+        w = w / np.sum(w, axis = 1).reshape((-1, 1))
+
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        
+        m, n = x.shape
+        m_tilde, n = x_tilde.shape
+        w_tilde = (np.arange(K)[:, None] == z.reshape(m_tilde)).T
+
+        phi = (m + alpha*m_tilde)**(-1) * (np.sum(w, axis = 0) + alpha * np.sum(w_tilde, axis = 0))
+        
+        mu = np.einsum( 'il, ij -> lj', w , x) + alpha * np.einsum( 'il, ij -> lj', w_tilde, x_tilde)
+        mu /= np.sum(w, axis = 0).reshape((K,1)) + alpha * np.sum(w_tilde, axis = 0).reshape((K,1))
+        
+        for j in range(K):
+            
+            sigma[j] = np.sum( w[:,j].reshape((m, 1 ,1)) * np.einsum( 'ij, ik -> ijk', (x - mu[j]), (x - mu[j])), axis = 0) 
+            sigma[j] += alpha * np.sum( w_tilde[:,j].reshape((m_tilde, 1 ,1)) * np.einsum( 'ij, ik -> ijk', (x_tilde - mu[j]), (x_tilde - mu[j])), axis = 0) 
+            sigma[j] /= np.sum(w[:,j]) + alpha * np.sum(w_tilde[:,j])
+            
         # (3) Compute the log-likelihood of the data to check for convergence.
         # Hint: Make sure to include alpha in your calculation of ll.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+        
+        it += 1
+        prev_ll = ll
+        
+        ll = np.sum(np.log(np.sum(w, axis = 1))) 
+        for i in range(m_tilde):  
+            ll += -0.5 * ( (x[i] - mu[int(z[i])])).dot( sigma[int(z[i])] @ (x[i] - mu[int(z[i])]))
+        
+        print(it, ll)
+
         # *** END CODE HERE ***
 
     return w
@@ -197,5 +269,5 @@ if __name__ == '__main__':
         # Once you've implemented the semi-supervised version,
         # uncomment the following line.
         # You do not need to add any other lines in this code block.
-        # main(with_supervision=True, trial_num=t)
+        main(is_semi_supervised=True, trial_num=t)
         # *** END CODE HERE ***
