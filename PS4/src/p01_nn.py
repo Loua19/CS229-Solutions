@@ -41,6 +41,12 @@ def backward_softmax(x, grad_outputs):
     """
     
     # *** START CODE HERE ***
+    
+    sigma_x = np.sum(np.exp(x))
+    ex_x = np.exp(x)
+    dSM_x = (1/sigma_x)**2 * (np.diag(ex_x*sigma_x) - np.outer(ex_x, ex_x))
+    return grad_outputs @ dSM_x
+
     # *** END CODE HERE ***
 
 def forward_relu(x):
@@ -71,6 +77,11 @@ def backward_relu(x, grad_outputs):
     """
 
     # *** START CODE HERE ***
+
+    grad_outputs[x<=0] = 0
+
+    return grad_outputs
+
     # *** END CODE HERE ***
 
 def get_initial_params():
@@ -155,6 +166,50 @@ def backward_convolution(conv_W, conv_b, data, output_grad):
     """
 
     # *** START CODE HERE ***
+
+    # ** General prescription on how to make these things easier **
+    # Have a function with output shape (N, M, K) and input shape (variables) (A, B, C)
+    # grad_outputs has (N, M, K) where [i,j,k] = dF/dy_ijk (F is loss function)
+    # First calculate  dy_ijk/dx_abc and put this in D[i, j, k, a, b, c]
+    # Secondly calculate the new gradient as np.einsum('ijkabc, ijk -> abc', D, output_grad)
+    
+    # Calculate d_cw:
+    
+    x_c, y_c = output_grad.shape[1], output_grad.shape[2]
+    
+    D = np.zeros(output_grad.shape + conv_W.shape)
+    for cout in range(conv_W.shape[0]):
+        for cin in range(conv_W.shape[1]):
+            for di in range(conv_W.shape[2]):
+                for dj in range(conv_W.shape[3]):
+                    D[cout, :, :, cout, cin, di, dj] = data[cin, di:(x_c+di), dj:(y_c+dj)]
+
+    d_cw = np.einsum('ijkabcd, ijk -> abcd', D, output_grad)   
+    
+    # Calculate d_cb
+
+    D = np.zeros(output_grad.shape + conv_b.shape)
+    for cout in range(conv_b.shape[0]):
+        D[cout, :, :, cout] = 1
+        
+    d_cb = np.einsum('ijka, ijk -> a', D, output_grad) 
+    
+    # Calculate d_d
+    
+    D = np.zeros(output_grad.shape + data.shape)
+    width, height = data.shape[1], data.shape[2]
+    conv_width, conv_height = conv_W.shape[2], conv_W.shape[3]
+    
+    for cout in range(conv_W.shape[0]):
+        for cin in range(data.shape[0]):
+            for x in range(conv_W.shape[1]):
+                for y in range(conv_W.shape[2]):
+                    D[cout, x, y, cin, x:(x + conv_width), y:(y + conv_height)] = conv_W[cout, cin, :, :] 
+
+    d_d = np.einsum('ijkabc, ijk -> abc', D, output_grad)
+
+    return (d_cw, d_cb, d_d)
+
     # *** END CODE HERE ***
 
 def forward_max_pool(data, pool_width, pool_height):
@@ -197,6 +252,24 @@ def backward_max_pool(data, pool_width, pool_height, output_grad):
     """
     
     # *** START CODE HERE ***
+    
+    # See backwards_convolution for einsum explanation. 
+    
+    channels, width, height = data.shape
+    D = np.zeros(output_grad.shape + data.shape)
+
+    for c in range(channels):
+        for x in range(width//pool_width):
+            for y in range(height//pool_height):
+                
+                x1, x2 = x*pool_width, (x+1)*pool_width
+                y1, y2 = y*pool_height, (y+1)*pool_height
+                D[c, x, y, c, x1:x2, y1:y2][np.unravel_index(data[c, x1:x2, y1:y2].argmax(), data[c, x1:x2, y1:y2].shape)] = 1
+
+    d_d = np.einsum('ijkabc, ijk -> abc', D, output_grad)
+    
+    return d_d
+
     # *** END CODE HERE ***
 
 def forward_cross_entropy_loss(probabilities, labels):
@@ -234,6 +307,9 @@ def backward_cross_entropy_loss(probabilities, labels):
     """
 
     # *** START CODE HERE ***
+    
+    return -labels/probabilities
+
     # *** END CODE HERE ***
 
 def forward_linear(weights, bias, data):
@@ -265,6 +341,9 @@ def backward_linear(weights, bias, data, output_grad):
     """
 
     # *** START CODE HERE ***
+    
+    return (np.outer(data, output_grad), output_grad, output_grad @ weights.T)
+
     # *** END CODE HERE ***
 
 def forward_prop(data, labels, params):
@@ -324,6 +403,34 @@ def backward_prop(data, labels, params):
     """
 
     # *** START CODE HERE ***
+    
+    W1 = params['W1']
+    b1 = params['b1']
+    W2 = params['W2']
+    b2 = params['b2']
+
+    # Forward pass
+    
+    conv = forward_convolution(W1, b1, data)
+    pool = forward_max_pool(conv, MAX_POOL_SIZE, MAX_POOL_SIZE)
+    relu = forward_relu(pool)
+    linear = forward_linear(W2, b2, relu.reshape(-1))
+    sm = forward_softmax(linear)
+    loss = forward_cross_entropy_loss(sm, labels)
+    
+    # Backwards pass
+    
+    res = {}
+
+    d_probs = backward_cross_entropy_loss(sm, labels)
+    d_logits = backward_softmax(linear, d_probs)
+    res['W2'], res['b2'], d_lin = backward_linear(W2, b2, relu.reshape(-1), d_logits)
+    d_relu = backward_relu(pool, d_lin.reshape(pool.shape))
+    d_pool = backward_max_pool(conv, MAX_POOL_SIZE, MAX_POOL_SIZE, d_relu)
+    res['W1'], res['b1'], d_conv = backward_convolution(W1, b1, data, d_pool)
+
+    return res
+    
     # *** END CODE HERE ***
 
 def forward_prop_batch(batch_data, batch_labels, params, forward_prop_func):
