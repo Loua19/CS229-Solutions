@@ -125,6 +125,16 @@ def choose_action(state, mdp_data):
     """
 
     # *** START CODE HERE ***
+    
+    transition_probs = mdp_data['transition_probs']
+    value = mdp_data['value'] 
+    exval = np.sum(transition_probs[state, :, :]*value.reshape(-1, 1), axis = 0)
+    
+    if exval[0] == exval[1]:
+        return np.random.randint(2)
+    else:
+        return np.argmax(exval)
+
     # *** END CODE HERE ***
 
 def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_state, reward):
@@ -149,6 +159,14 @@ def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_stat
     """
 
     # *** START CODE HERE ***
+    
+    mdp_data['transition_counts'][state, new_state, action] += 1
+    
+    if reward == -1:
+        mdp_data['reward_counts'][new_state][1] += 1
+    else:
+        mdp_data['reward_counts'][new_state][0] += 1
+    
     # *** END CODE HERE ***
 
     # This function does not return anything
@@ -172,6 +190,21 @@ def update_mdp_transition_probs_reward(mdp_data):
     """
 
     # *** START CODE HERE ***
+    
+    num_states = mdp_data['num_states']
+
+    # State transition probabilities
+    transition_counts = mdp_data['transition_counts'] + 1 # Laplace smoothing. Shape (num_states, num_states, 2)
+    mdp_data['transition_probs'] = transition_counts/(np.sum(transition_counts, axis=1).reshape(num_states, 1, 2))
+    
+    
+    # Rewards
+    reward_counts = mdp_data['reward_counts'] 
+    mdp_data['reward'] = (-1) * np.divide(reward_counts[:,1],
+                                          np.sum(reward_counts[:,:], axis = 1),
+                                          out=np.zeros_like(reward_counts[:,1]),
+                                          where=np.sum(reward_counts[:,:], axis = 1)!=0)
+    
     # *** END CODE HERE ***
 
     # This function does not return anything
@@ -198,6 +231,29 @@ def update_mdp_value(mdp_data, tolerance, gamma):
     """
 
     # *** START CODE HERE ***
+    
+    num_states = mdp_data['num_states']
+    reward = mdp_data['reward']
+    probs = mdp_data['transition_probs']
+    value = mdp_data['value'] # Solutions have this initialisation
+    
+    i = 0
+    while True:
+
+        value_prev = value
+        value = reward + gamma * np.max( np.sum( probs * value.reshape(-1, 1), axis = 1), axis = 1)
+
+        if np.max(np.abs(value - value_prev)) <= tolerance:
+                break
+        i+=1
+    
+    mdp_data['value'] = value
+
+    if i == 0: 
+        return True
+    else:
+        return
+            
     # *** END CODE HERE ***
 
 def main(plot=True):
@@ -213,7 +269,7 @@ def main(plot=True):
     NUM_STATES = 163
     GAMMA = 0.995
     TOLERANCE = 0.01
-    NO_LEARNING_THRESHOLD = 20
+    NO_LEARNING_THRESHOLD = 100
 
     # Time cycle of the simulation
     time = 0
