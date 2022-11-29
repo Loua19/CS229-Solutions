@@ -5,4 +5,4 @@ To run the code:
 - Run `conda env create -f environment.yml`
 - Run `conda activate cs229`
 
-NOTE: I do not make use of the 'run.py' script for Q1. Instead I have added an 'if __name__ == '__main__' function to generate outputs for this question.
+NOTE: I do not make use of the 'run.py' script for Q1. Instead I have added an `if '__name__' == '__main__'` function to generate outputs for this question.
